@@ -120,7 +120,9 @@ void WiFiManager::setupConfigPortal() {
   server->on("/", std::bind(&WiFiManager::handleRoot, this));
   server->on("/wifi", std::bind(&WiFiManager::handleWifi, this, true));
   server->on("/0wifi", std::bind(&WiFiManager::handleWifi, this, false));
+  server->on("/cgate", std::bind(&WiFiManager::handleCgate, this));
   server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
+  server->on("/cgatesave", std::bind(&WiFiManager::handleCgateSave, this));
   server->on("/i", std::bind(&WiFiManager::handleInfo, this));
   server->on("/r", std::bind(&WiFiManager::handleReset, this));
   //server->on("/generate_204", std::bind(&WiFiManager::handle204, this));  //Android/Chrome OS captive portal check.
@@ -485,6 +487,7 @@ void WiFiManager::handleWifi(boolean scan) {
   }
 
   page += FPSTR(HTTP_FORM_START);
+/* Moved to tge c-gate config page
   char parLength[2];
   // add the extra parameters to the form
   for (int i = 0; i < _paramsCount; i++) {
@@ -510,7 +513,7 @@ void WiFiManager::handleWifi(boolean scan) {
   if (_params[0] != NULL) {
     page += "<br/>";
   }
-
+*/
   if (_sta_static_ip) {
 
     String item = FPSTR(HTTP_FORM_PARAM);
@@ -555,6 +558,57 @@ void WiFiManager::handleWifi(boolean scan) {
   DEBUG_WM(F("Sent config page"));
 }
 
+void WiFiManager::handleCgate() {
+
+  String page = FPSTR(HTTP_HEAD);
+  page.replace("{v}", "C-Gate");
+  page += FPSTR(HTTP_SCRIPT);
+  page += FPSTR(HTTP_STYLE);
+  page += _customHeadElement;
+  page += FPSTR(HTTP_HEAD_END);
+  page += F("<h1>C-Gate Configuration</h1>");
+
+  page += FPSTR(HTTP_FORM_CGATE);
+
+  char parLength[2];
+  // add the extra parameters to the form
+  for (int i = 0; i < _paramsCount; i++) {
+    if (_params[i] == NULL) {
+      break;
+    }
+
+    String pitem = FPSTR(HTTP_FORM_PARAM);
+    if (_params[i]->getID() != NULL) {
+      //page += F( server->arg((_params[i]->getID()).c_str());  //  server->arg(_params[i]->getID()).c_str();
+      pitem.replace("{i}", _params[i]->getID());
+      pitem.replace("{n}", _params[i]->getID());
+      pitem.replace("{p}", _params[i]->getPlaceholder());
+      snprintf(parLength, 2, "%d", _params[i]->getValueLength());
+      pitem.replace("{l}", parLength);
+      pitem.replace("{v}", _params[i]->getValue());
+      pitem.replace("{c}", _params[i]->getCustomHTML());
+    } else {
+      pitem = _params[i]->getCustomHTML();
+    }
+    String myitem = _params[i]->getCustomHTML();
+    page += myitem;
+    page += pitem;
+  }
+  if (_params[0] != NULL) {
+    page += "<br/>";
+  }
+  page += "<br/>";
+
+  page += FPSTR(HTTP_FORM_END);
+  page += FPSTR(HTTP_END);
+
+  server->sendHeader("Content-Length", String(page.length()));
+  server->send(200, "text/html", page);
+
+  DEBUG_WM(F("Sent C-Gate config page"));
+
+}
+
 /** Handle the WLAN save form and redirect to WLAN config page again */
 void WiFiManager::handleWifiSave() {
   DEBUG_WM(F("WiFi save"));
@@ -562,7 +616,7 @@ void WiFiManager::handleWifiSave() {
   //SAVE/connect here
   _ssid = server->arg("s").c_str();
   _pass = server->arg("p").c_str();
-
+/*
   //parameters
   for (int i = 0; i < _paramsCount; i++) {
     if (_params[i] == NULL) {
@@ -576,7 +630,7 @@ void WiFiManager::handleWifiSave() {
     DEBUG_WM(_params[i]->getID());
     DEBUG_WM(value);
   }
-
+*/
   if (server->arg("ip") != "") {
     DEBUG_WM(F("static ip"));
     DEBUG_WM(server->arg("ip"));
@@ -612,6 +666,36 @@ void WiFiManager::handleWifiSave() {
   DEBUG_WM(F("Sent wifi save page"));
 
   connect = true; //signal ready to connect/reset
+}
+
+void WiFiManager::handleCgateSave() {
+  DEBUG_WM(F("C-gate save"));
+  //parameters
+  for (int i = 0; i < _paramsCount; i++) {
+    if (_params[i] == NULL) {
+      break;
+    }
+    //read parameter
+    String value = server->arg(_params[i]->getID()).c_str();
+    //store it in array
+    value.toCharArray(_params[i]->_value, _params[i]->_length);
+    DEBUG_WM(F("Parameter"));
+    DEBUG_WM(_params[i]->getID());
+    DEBUG_WM(value);
+  }
+
+  String page = FPSTR(HTTP_HEAD);
+  page.replace("{v}", "C-Gate settings Saved");
+  page += FPSTR(HTTP_SCRIPT);
+  page += FPSTR(HTTP_STYLE);
+  page += _customHeadElement;
+  page += FPSTR(HTTP_HEAD_END);
+  page += FPSTR(HTTP_CSAVED);
+  page += FPSTR(HTTP_RETURN_LINK);
+  page += FPSTR(HTTP_END);
+  server->sendHeader("Content-Length", String(page.length()));
+  server->send(200, "text/html", page);
+
 }
 
 /** Handle the info page */
